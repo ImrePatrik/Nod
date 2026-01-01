@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Charades! Party Játék</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: linear-gradient(#ff6b6b, #feca57); margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+        #word { font-size: 6em; font-weight: bold; margin: 20px 0; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); min-height: 250px; display: flex; align-items: center; justify-content: center; }
+        select, button { font-size: 1.5em; padding: 15px; margin: 10px; border-radius: 10px; border: none; background: white; cursor: pointer; }
+        .preset-btn.active { background: #4ecdc4; color: white; font-weight: bold; }
+        #timer { font-size: 3em; color: white; margin: 10px; }
+        #score { font-size: 2em; color: white; }
+        #status { font-size: 1.5em; color: #333; background: rgba(255,255,255,0.8); padding: 10px; border-radius: 10px; }
+        #instructions { font-size: 1.2em; color: white; margin-bottom: 20px; }
+        .presets { display: flex; justify-content: center; flex-wrap: wrap; }
+    </style>
+    <script>
+        let words = {
+            allatok: ['kutya', 'macska', 'oroszlán', 'pingvin', 'kígyó', 'madár', 'hal', 'róka'],
+            szinesznoek: ['Tom Cruise', 'Johnny Depp', 'Emma Watson', 'Dwayne Johnson', 'Margot Robbie'],
+            filmek: ['Csillagok háborúja', 'Titanic', 'Jégvarázs', 'Avengers', 'Harry Potter'],
+            tevjeletek: ['futás', 'tánc', 'énekelés', 'ugrálás', 'evés', 'aludás']
+        };
+        let currentWords = []; let score = 0; let timeLeft = 60; let gameTimer; let gameRunning = false; let isLandscape = false; let maxTime = 60;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        window.onload = () => {
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
+            document.getElementById('startBtn').onclick = startGame;
+            document.getElementById('newWordBtn').onclick = newWord;
+            selectPreset({target: document.querySelector('.preset-btn')});  // Alap 60s
+            playBeep(800, 0.1);
+        };
+
+        function selectPreset(e) {
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            maxTime = parseInt(e.target.dataset.time);
+            document.getElementById('status').textContent = `${maxTime}s kiválasztva!`;
+        }
+
+        function playBeep(frequency, duration) {
+            const oscillator = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = frequency; oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            oscillator.start(audioCtx.currentTime); oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        async function startGame() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission !== 'granted') return alert('Mozgásérzékelő engedély kell!');
+            }
+            window.addEventListener('deviceorientation', handleTilt);
+            window.addEventListener('orientationchange', updateOrientation);
+            const cat = document.getElementById('category').value;
+            currentWords = words[cat];
+            score = 0; timeLeft = maxTime; updateDisplay();
+            newWord(); gameRunning = true;
+            gameTimer = setInterval(() => {
+                timeLeft--; updateDisplay(); playBeep(1000 - timeLeft * 5, 0.05);
+                if (timeLeft <= 0) { endGame(); }
+            }, 1000);
+            document.getElementById('status').textContent = `${maxTime}s Charades indítva! Homlokra!`;
+        }
+
+        function updateOrientation() {
+            isLandscape = screen.orientation?.angle === 90 || screen.orientation?.angle === -90 || window.orientation === 90 || window.orientation === -90;
+        }
+
+        function handleTilt(event) {
+            if (!gameRunning) return;
+            let tiltValue = isLandscape ? (event.gamma || 0) : (event.beta || 0);
+            if (Math.abs(tiltValue) > 35) {
+                clearInterval(gameTimer);
+                playBeep(tiltValue < -35 ? 400 : 800, 0.2);
+                if (tiltValue < -35) {
+                    document.getElementById('status').textContent = 'PASSZ! Új szó...';
+                } else {
+                    score++; document.getElementById('status').textContent = 'TALÁLAT! +1 pont';
+                }
+                setTimeout(() => { if (timeLeft > 0) newWord(); }, 800);
+            }
+        }
+
+        function newWord() {
+            const word = currentWords[Math.floor(Math.random() * currentWords.length)];
+            document.getElementById('word').textContent = word;
+        }
+
+        function updateDisplay() {
+            document.getElementById('timer').textContent = timeLeft;
+            document.getElementById('score').textContent = `Pont: ${score}`;
+        }
+
+        function endGame() {
+            gameRunning = false;
+            document.getElementById('status').textContent = `Kör vége (${maxTime}s)! Pont: ${score}. Új presetet válassz!`;
+            playBeep(200, 1);
+        }
+    </script>
+</head>
+<body>
+    <div id="instructions">Charades! Válassz preset timer-t (30/45/60s), homlokra telefon!</div>
+    <select id="category">
+        <option value="allatok">Állatok</option>
+        <option value="szinesznoek">Színészek</option>
+        <option value="filmek">Filmek</option>
+        <option value="tevjeletek">Tévひvatások</option>
+    </select>
+    <div class="presets">
+        <button class="preset-btn" data-time="30">30s</button>
+        <button class="preset-btn" data-time="45">45s</button>
+        <button class="preset-btn active" data-time="60">60s</button>
+    </div>
+    <br><button id="startBtn">Kör Indítás</button><button id="newWordBtn">Új Szó</button>
+    <div id="timer">60</div>
+    <div id="score">Pont: 0</div>
+    <div id="word">Válassz!</div>
+    <div id="status">60s aktív</div>
+</body>
+</html>

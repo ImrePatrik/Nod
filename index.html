@@ -2,34 +2,77 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Nod</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: linear-gradient(#ff6b6b, #feca57); margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; justify-content: center; }
-        #word { font-size: 6em; font-weight: bold; margin: 20px 0; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); min-height: 250px; display: flex; align-items: center; justify-content: center; }
-        select, button { font-size: 1.5em; padding: 15px; margin: 10px; border-radius: 10px; border: none; background: white; cursor: pointer; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            position: fixed;
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(#ff6b6b, #feca57);
+            touch-action: manipulation;
+        }
+        body { 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center;
+            padding: 10px;
+        }
+        #word { 
+            font-size: 4em; 
+            font-weight: bold; 
+            color: white; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
+            text-align: center;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        select, button { 
+            font-size: 1.2em; 
+            padding: 12px 20px; 
+            margin: 5px; 
+            border-radius: 10px; 
+            border: none; 
+            background: white; 
+            cursor: pointer; 
+        }
         .preset-btn.active { background: #4ecdc4; color: white; font-weight: bold; }
-        #timer { font-size: 3em; color: white; margin: 10px; }
-        #score { font-size: 2em; color: white; }
-        #status { font-size: 1.5em; color: #333; background: rgba(255,255,255,0.8); padding: 10px; border-radius: 10px; }
-        #instructions { font-size: 1.2em; color: white; margin-bottom: 20px; }
+        #timer { font-size: 2.5em; color: white; margin: 10px; font-weight: bold; }
+        #score { font-size: 1.8em; color: white; margin: 5px; }
         .presets { display: flex; justify-content: center; flex-wrap: wrap; }
+        .controls { text-align: center; }
     </style>
     <script>
         let words = {
             allatok: ['kutya', 'macska', 'oroszlán', 'pingvin', 'kígyó', 'madár', 'hal', 'róka'],
-            szinesznoek: ['Tom Cruise', 'Johnny Depp', 'Emma Watson', 'Dwayne Johnson', 'Margot Robbie'],
+            szineszek: ['Tom Cruise', 'Johnny Depp', 'Emma Watson', 'Dwayne Johnson', 'Margot Robbie'],
             filmek: ['Csillagok háborúja', 'Titanic', 'Jégvarázs', 'Avengers', 'Harry Potter'],
-            tevjeletek: ['futás', 'tánc', 'énekelés', 'ugrálás', 'evés', 'aludás']
+            tevekenysegek: ['futás', 'tánc', 'énekelés', 'ugrálás', 'evés', 'aludás', 'úszás']
         };
-        let currentWords = []; let score = 0; let timeLeft = 60; let gameTimer; let gameRunning = false; let isLandscape = false; let maxTime = 60;
+        let currentWords = []; 
+        let score = 0; 
+        let timeLeft = 60; 
+        let gameTimer = null; 
+        let gameRunning = false; 
+        let isLandscape = false; 
+        let maxTime = 60;
+        let lastTilt = 0;
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         window.onload = () => {
             document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
             document.getElementById('startBtn').onclick = startGame;
-            document.getElementById('newWordBtn').onclick = newWord;
-            selectPreset({target: document.querySelector('.preset-btn')});  // Alap 60s
+            selectPreset({target: document.querySelector('.preset-btn')});
             playBeep(800, 0.1);
         };
 
@@ -37,88 +80,115 @@
             document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
             maxTime = parseInt(e.target.dataset.time);
-            document.getElementById('status').textContent = `${maxTime}s kiválasztva!`;
         }
 
         function playBeep(frequency, duration) {
-            const oscillator = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
-            oscillator.frequency.value = frequency; oscillator.type = 'sine';
-            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-            oscillator.start(audioCtx.currentTime); oscillator.stop(audioCtx.currentTime + duration);
+            try {
+                const oscillator = audioCtx.createOscillator(); 
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode); 
+                gainNode.connect(audioCtx.destination);
+                oscillator.frequency.value = frequency; 
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                oscillator.start(audioCtx.currentTime); 
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
         }
 
         async function startGame() {
+            // KRITIKUS: Clear előző timer hogy ne halmozódjon
+            if (gameTimer) clearInterval(gameTimer);
+            
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 const permission = await DeviceOrientationEvent.requestPermission();
                 if (permission !== 'granted') return alert('Mozgásérzékelő engedély kell!');
             }
+            
+            window.removeEventListener('deviceorientation', handleTilt); // Duplikáció ellen
             window.addEventListener('deviceorientation', handleTilt);
             window.addEventListener('orientationchange', updateOrientation);
+            
             const cat = document.getElementById('category').value;
-            currentWords = words[cat];
-            score = 0; timeLeft = maxTime; updateDisplay();
-            newWord(); gameRunning = true;
+            currentWords = [...words[cat]]; // Másolat, ne módosítsa eredetit
+            score = 0; 
+            timeLeft = maxTime; 
+            gameRunning = true;
+            lastTilt = Date.now();
+            updateDisplay();
+            newWord();
+            
             gameTimer = setInterval(() => {
-                timeLeft--; updateDisplay(); playBeep(1000 - timeLeft * 5, 0.05);
-                if (timeLeft <= 0) { endGame(); }
+                timeLeft--; 
+                updateDisplay(); 
+                if (timeLeft > 0 && timeLeft <= 10) playBeep(1200, 0.05); // Csak utolsó 10s
+                if (timeLeft <= 0) endGame();
             }, 1000);
-            document.getElementById('status').textContent = `${maxTime}s Charades indítva! Homlokra!`;
         }
 
         function updateOrientation() {
-            isLandscape = screen.orientation?.angle === 90 || screen.orientation?.angle === -90 || window.orientation === 90 || window.orientation === -90;
+            isLandscape = screen.orientation?.angle === 90 || screen.orientation?.angle === -90 || 
+                          window.orientation === 90 || window.orientation === -90;
         }
 
         function handleTilt(event) {
             if (!gameRunning) return;
+            const now = Date.now();
+            if (now - lastTilt < 800) return; // Debounce 800ms
+            
             let tiltValue = isLandscape ? (event.gamma || 0) : (event.beta || 0);
-            if (Math.abs(tiltValue) > 35) {
-                clearInterval(gameTimer);
-                playBeep(tiltValue < -35 ? 400 : 800, 0.2);
-                if (tiltValue < -35) {
-                    document.getElementById('status').textContent = 'PASSZ! Új szó...';
-                } else {
-                    score++; document.getElementById('status').textContent = 'TALÁLAT! +1 pont';
-                }
-                setTimeout(() => { if (timeLeft > 0) newWord(); }, 800);
+            
+            // JAVÍTVA: Megfordítva logika - lefele passz, felfele találat
+            if (tiltValue > 35) {  // Lefele billentés (pozitív beta/gamma): PASSZ
+                lastTilt = now;
+                playBeep(400, 0.2);
+                newWord();
+            } else if (tiltValue < -35) {  // Felfele billentés (negatív): TALÁLAT
+                lastTilt = now;
+                score++;
+                playBeep(800, 0.2);
+                newWord();
             }
         }
 
         function newWord() {
+            if (currentWords.length === 0) return;
             const word = currentWords[Math.floor(Math.random() * currentWords.length)];
             document.getElementById('word').textContent = word;
         }
 
         function updateDisplay() {
-            document.getElementById('timer').textContent = timeLeft;
-            document.getElementById('score').textContent = `Pont: ${score}`;
+            document.getElementById('timer').textContent = timeLeft + 's';
+            document.getElementById('score').textContent = 'Pont: ' + score;
         }
 
         function endGame() {
+            if (gameTimer) clearInterval(gameTimer);
+            gameTimer = null;
             gameRunning = false;
-            document.getElementById('status').textContent = `Kör vége (${maxTime}s)! Pont: ${score}. Új presetet válassz!`;
+            document.getElementById('word').textContent = 'Kör vége! Pont: ' + score;
             playBeep(200, 1);
         }
     </script>
 </head>
 <body>
-    <div id="instructions">Charades! Válassz preset timer-t (30/45/60s), homlokra telefon!</div>
-    <select id="category">
-        <option value="allatok">Állatok</option>
-        <option value="szinesznoek">Színészek</option>
-        <option value="filmek">Filmek</option>
-        <option value="tevjeletek">Tévひvatások</option>
-    </select>
-    <div class="presets">
-        <button class="preset-btn" data-time="30">30s</button>
-        <button class="preset-btn" data-time="45">45s</button>
-        <button class="preset-btn active" data-time="60">60s</button>
+    <div class="controls">
+        <select id="category">
+            <option value="allatok">Állatok</option>
+            <option value="szineszek">Színészek</option>
+            <option value="filmek">Filmek</option>
+            <option value="tevekenysegek">Tevékenységek</option>
+        </select>
+        <div class="presets">
+            <button class="preset-btn" data-time="30">30s</button>
+            <button class="preset-btn" data-time="45">45s</button>
+            <button class="preset-btn active" data-time="60">60s</button>
+        </div>
+        <button id="startBtn">START</button>
     </div>
-    <br><button id="startBtn">Kör Indítás</button><button id="newWordBtn">Új Szó</button>
-    <div id="timer">60</div>
+    <div id="timer">60s</div>
     <div id="score">Pont: 0</div>
-    <div id="word">Válassz!</div>
-    <div id="status">60s aktív</div>
+    <div id="word">Válassz kategóriát és indítsd!</div>
 </body>
 </html>

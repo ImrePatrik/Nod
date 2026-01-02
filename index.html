@@ -62,12 +62,9 @@
             flex-direction: column;
             gap: 12px;
             align-items: center;
-            transition: opacity 0.3s, visibility 0.3s;
         }
         .controls.hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
+            display: none;
         }
         select { 
             font-size: 1.2em; 
@@ -180,7 +177,7 @@
                 if (permission !== 'granted') return alert('Tájérzékelő engedély kell!');
             }
             
-            // Gombok elrejtése
+            // Gombok azonnali eltüntetése
             document.querySelector('.controls').classList.add('hidden');
             
             const cat = document.getElementById('category').value;

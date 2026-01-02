@@ -3,44 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Nod</title>
+    <title>Nod!</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { 
-            width: 100%; 
-            height: 100%; 
-            overflow: hidden; 
-            position: fixed;
+        body { 
             font-family: Arial, sans-serif; 
             background: linear-gradient(#ff6b6b, #feca57);
-            touch-action: manipulation;
-        }
-        body { 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center;
-            padding: 10px;
+            text-align: center;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         #word { 
-            font-size: 4em; 
+            font-size: clamp(3em, 15vw, 6em); 
             font-weight: bold; 
             color: white; 
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
-            text-align: center;
-            flex: 1;
+            margin: 20px 0;
+            min-height: 200px;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 100%;
         }
         select, button { 
             font-size: 1.2em; 
             padding: 12px 20px; 
-            margin: 5px; 
+            margin: 8px; 
             border-radius: 10px; 
             border: none; 
             background: white; 
@@ -48,9 +38,9 @@
         }
         .preset-btn.active { background: #4ecdc4; color: white; font-weight: bold; }
         #timer { font-size: 2.5em; color: white; margin: 10px; font-weight: bold; }
-        #score { font-size: 1.8em; color: white; margin: 5px; }
-        .presets { display: flex; justify-content: center; flex-wrap: wrap; }
-        .controls { text-align: center; }
+        #score { font-size: 1.8em; color: white; margin: 10px; }
+        .presets { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .controls { margin-bottom: 20px; }
     </style>
     <script>
         let words = {
@@ -64,16 +54,16 @@
         let timeLeft = 60; 
         let gameTimer = null; 
         let gameRunning = false; 
-        let isLandscape = false; 
         let maxTime = 60;
-        let lastTilt = 0;
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let lastTiltTime = 0;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext || (() => {}))();
+        const TILT_THRESHOLD = 1.2;
+        const DEBOUNCE_MS = 1200;
 
         window.onload = () => {
             document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
             document.getElementById('startBtn').onclick = startGame;
             selectPreset({target: document.querySelector('.preset-btn')});
-            playBeep(800, 0.1);
         };
 
         function selectPreset(e) {
@@ -86,76 +76,65 @@
             try {
                 const oscillator = audioCtx.createOscillator(); 
                 const gainNode = audioCtx.createGain();
-                oscillator.connect(gainNode); 
-                gainNode.connect(audioCtx.destination);
-                oscillator.frequency.value = frequency; 
-                oscillator.type = 'sine';
+                oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+                oscillator.frequency.value = frequency; oscillator.type = 'sine';
                 gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                oscillator.start(audioCtx.currentTime); 
-                oscillator.stop(audioCtx.currentTime + duration);
+                oscillator.start(audioCtx.currentTime); oscillator.stop(audioCtx.currentTime + duration);
             } catch(e) {}
         }
 
         async function startGame() {
-            // KRITIKUS: Clear előző timer hogy ne halmozódjon
             if (gameTimer) clearInterval(gameTimer);
             
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission !== 'granted') return alert('Mozgásérzékelő engedély kell!');
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                const permission = await DeviceMotionEvent.requestPermission();
+                if (permission !== 'granted') return alert('Gyorsulásmérő engedély kell!');
             }
             
-            window.removeEventListener('deviceorientation', handleTilt); // Duplikáció ellen
-            window.addEventListener('deviceorientation', handleTilt);
-            window.addEventListener('orientationchange', updateOrientation);
-            
             const cat = document.getElementById('category').value;
-            currentWords = [...words[cat]]; // Másolat, ne módosítsa eredetit
-            score = 0; 
-            timeLeft = maxTime; 
-            gameRunning = true;
-            lastTilt = Date.now();
+            currentWords = [...words[cat]];
+            score = 0; timeLeft = maxTime; gameRunning = true;
+            lastTiltTime = 0;
             updateDisplay();
             newWord();
             
+            window.addEventListener('devicemotion', handleMotion);
+            
             gameTimer = setInterval(() => {
-                timeLeft--; 
-                updateDisplay(); 
-                if (timeLeft > 0 && timeLeft <= 10) playBeep(1200, 0.05); // Csak utolsó 10s
+                timeLeft--; updateDisplay();
+                if (timeLeft > 0 && timeLeft <= 10) playBeep(1200, 0.05);
                 if (timeLeft <= 0) endGame();
             }, 1000);
         }
 
-        function updateOrientation() {
-            isLandscape = screen.orientation?.angle === 90 || screen.orientation?.angle === -90 || 
-                          window.orientation === 90 || window.orientation === -90;
-        }
-
-        function handleTilt(event) {
+        function handleMotion(event) {
             if (!gameRunning) return;
             const now = Date.now();
-            if (now - lastTilt < 800) return; // Debounce 800ms
+            if (now - lastTiltTime < DEBOUNCE_MS) return;
             
-            let tiltValue = isLandscape ? (event.gamma || 0) : (event.beta || 0);
+            const accZ = event.accelerationIncludingGravity?.z || 0;
             
-            // JAVÍTVA: Megfordítva logika - lefele passz, felfele találat
-            if (tiltValue > 35) {  // Lefele billentés (pozitív beta/gamma): PASSZ
-                lastTilt = now;
-                playBeep(400, 0.2);
-                newWord();
-            } else if (tiltValue < -35) {  // Felfele billentés (negatív): TALÁLAT
-                lastTilt = now;
-                score++;
-                playBeep(800, 0.2);
-                newWord();
+            if (Math.abs(accZ) > TILT_THRESHOLD) {
+                lastTiltTime = now;
+                
+                if (accZ < -TILT_THRESHOLD) { // LEFELÉ nézés (előre billen) = TALÁLAT
+                    score++;
+                    playBeep(800, 0.2);
+                    document.getElementById('word').textContent = '✓ TALÁLAT!';
+                } else { // FELFELÉ nézés (hátra billen) = PASSZ
+                    playBeep(400, 0.2);
+                    document.getElementById('word').textContent = '→ PASSZ';
+                }
+                
+                setTimeout(newWord, 600);
             }
         }
 
         function newWord() {
             if (currentWords.length === 0) return;
-            const word = currentWords[Math.floor(Math.random() * currentWords.length)];
-            document.getElementById('word').textContent = word;
+            const idx = Math.floor(Math.random() * currentWords.length);
+            document.getElementById('word').textContent = currentWords[idx];
         }
 
         function updateDisplay() {
@@ -165,9 +144,9 @@
 
         function endGame() {
             if (gameTimer) clearInterval(gameTimer);
-            gameTimer = null;
             gameRunning = false;
-            document.getElementById('word').textContent = 'Kör vége! Pont: ' + score;
+            window.removeEventListener('devicemotion', handleMotion);
+            document.getElementById('word').textContent = 'KÖR VÉGE! Pont: ' + score;
             playBeep(200, 1);
         }
     </script>
@@ -189,6 +168,6 @@
     </div>
     <div id="timer">60s</div>
     <div id="score">Pont: 0</div>
-    <div id="word">Válassz kategóriát és indítsd!</div>
+    <div id="word">Készen állsz?</div>
 </body>
 </html>

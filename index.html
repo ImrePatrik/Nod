@@ -29,7 +29,7 @@
             justify-content: space-around;
         }
         #word { 
-            font-size: clamp(3em, 12vw, 5em); 
+            font-size: clamp(3em, 10vw, 5em); 
             font-weight: bold; 
             color: white; 
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
@@ -53,6 +53,20 @@
         #timer { font-size: 2.5em; color: white; font-weight: bold; }
         #score { font-size: 1.8em; color: white; margin: 5px; }
         .presets { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        #orientationWarning {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            font-size: 2em;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        #orientationWarning.show { display: flex; }
+        .rotate-icon { font-size: 4em; margin-bottom: 20px; }
     </style>
     <script>
         let words = {
@@ -68,9 +82,9 @@
         let gameRunning = false; 
         let maxTime = 60;
         let lastTiltTime = 0;
-        let initialBeta = null;
+        let initialGamma = null;
         const audioCtx = new (window.AudioContext || window.webkitAudioContext || (() => {}))();
-        const TILT_THRESHOLD = 40; // Fokokban
+        const TILT_THRESHOLD = 35;
         const DEBOUNCE_MS = 900;
 
         // Görgetés tiltása
@@ -81,7 +95,32 @@
             document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
             document.getElementById('startBtn').onclick = startGame;
             selectPreset({target: document.querySelector('.preset-btn')});
+            checkOrientation();
+            window.addEventListener('orientationchange', checkOrientation);
+            screen.orientation?.addEventListener('change', checkOrientation);
         };
+
+        function checkOrientation() {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const warning = document.getElementById('orientationWarning');
+            if (!isLandscape) {
+                warning.classList.add('show');
+                if (gameRunning) {
+                    // Szüneteltetés portrait módban
+                    if (gameTimer) clearInterval(gameTimer);
+                }
+            } else {
+                warning.classList.remove('show');
+                // Folytatás ha játék közben fordítottál vissza
+                if (gameRunning && !gameTimer) {
+                    gameTimer = setInterval(() => {
+                        timeLeft--; updateDisplay();
+                        if (timeLeft > 0 && timeLeft <= 10) playBeep(1200, 0.05);
+                        if (timeLeft <= 0) endGame();
+                    }, 1000);
+                }
+            }
+        }
 
         function selectPreset(e) {
             document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
@@ -102,6 +141,19 @@
         }
 
         async function startGame() {
+            // Ellenőrzés landscape-re
+            if (window.innerWidth <= window.innerHeight) {
+                alert('Fordítsd el a telefont fekvő módba!');
+                return;
+            }
+
+            // Landscape lock próba
+            try {
+                await screen.orientation?.lock('landscape');
+            } catch(e) {
+                console.log('Orientation lock nem támogatott');
+            }
+
             if (gameTimer) clearInterval(gameTimer);
             
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -112,7 +164,7 @@
             const cat = document.getElementById('category').value;
             currentWords = [...words[cat]];
             score = 0; timeLeft = maxTime; gameRunning = true;
-            lastTiltTime = 0; initialBeta = null;
+            lastTiltTime = 0; initialGamma = null;
             updateDisplay();
             newWord();
             
@@ -130,17 +182,17 @@
             const now = Date.now();
             if (now - lastTiltTime < DEBOUNCE_MS) return;
             
-            const beta = event.beta; // -180 to 180
+            // Landscape: gamma használata (bal/jobb -> előre/hátra billentés landscape-ben)
+            const gamma = event.gamma; // -90 to 90
             
-            // Kalibráció: első érték = homlok pozíció (kb 60-80°)
-            if (initialBeta === null) {
-                initialBeta = beta;
+            if (initialGamma === null) {
+                initialGamma = gamma;
                 return;
             }
             
-            const tiltDifference = beta - initialBeta;
+            const tiltDifference = gamma - initialGamma;
             
-            // Lefele billentés (előre dől, beta növekszik): TALÁLAT
+            // Lefele billentés (előre dől landscape-ben, gamma növekszik): TALÁLAT
             if (tiltDifference > TILT_THRESHOLD) {
                 lastTiltTime = now;
                 score++;
@@ -148,17 +200,17 @@
                 document.getElementById('word').textContent = '✓ TALÁLAT!';
                 setTimeout(() => {
                     newWord();
-                    initialBeta = null; // Reset kalibrációhoz
+                    initialGamma = null;
                 }, 500);
             }
-            // Felfele billentés (hátra dől, beta csökken): PASSZ
+            // Felfele billentés (hátra dől, gamma csökken): PASSZ
             else if (tiltDifference < -TILT_THRESHOLD) {
                 lastTiltTime = now;
                 playBeep(400, 0.2);
                 document.getElementById('word').textContent = '→ PASSZ';
                 setTimeout(() => {
                     newWord();
-                    initialBeta = null; // Reset kalibrációhoz
+                    initialGamma = null;
                 }, 500);
             }
         }
@@ -176,14 +228,23 @@
 
         function endGame() {
             if (gameTimer) clearInterval(gameTimer);
+            gameTimer = null;
             gameRunning = false;
             window.removeEventListener('deviceorientation', handleOrientation);
             document.getElementById('word').textContent = 'KÖR VÉGE! ' + score + ' pont';
             playBeep(200, 1);
+            try {
+                screen.orientation?.unlock();
+            } catch(e) {}
         }
     </script>
 </head>
 <body>
+    <div id="orientationWarning">
+        <div class="rotate-icon">📱 ↻</div>
+        <div>Fordítsd el a telefont<br>fekvő módba!</div>
+    </div>
+    
     <div class="controls">
         <select id="category">
             <option value="allatok">Állatok</option>
@@ -200,6 +261,6 @@
     </div>
     <div id="timer">60s</div>
     <div id="score">Pont: 0</div>
-    <div id="word">Válassz és indíts!</div>
+    <div id="word">Fordítsd fekvőre!</div>
 </body>
 </html>

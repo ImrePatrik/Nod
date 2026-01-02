@@ -68,10 +68,10 @@
         let gameRunning = false; 
         let maxTime = 60;
         let lastTiltTime = 0;
-        let lastBeta = null;
+        let initialBeta = null;
         const audioCtx = new (window.AudioContext || window.webkitAudioContext || (() => {}))();
-        const TILT_THRESHOLD = 45; // Fokokban - csak erős billentésre
-        const DEBOUNCE_MS = 1000;
+        const TILT_THRESHOLD = 40; // Fokokban
+        const DEBOUNCE_MS = 900;
 
         // Görgetés tiltása
         document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -112,7 +112,7 @@
             const cat = document.getElementById('category').value;
             currentWords = [...words[cat]];
             score = 0; timeLeft = maxTime; gameRunning = true;
-            lastTiltTime = 0; lastBeta = null;
+            lastTiltTime = 0; initialBeta = null;
             updateDisplay();
             newWord();
             
@@ -130,36 +130,36 @@
             const now = Date.now();
             if (now - lastTiltTime < DEBOUNCE_MS) return;
             
-            const beta = event.beta; // -180 to 180, előre/hátra billentés
+            const beta = event.beta; // -180 to 180
             
-            // Első mérés - referencia
-            if (lastBeta === null) {
-                lastBeta = beta;
+            // Kalibráció: első érték = homlok pozíció (kb 60-80°)
+            if (initialBeta === null) {
+                initialBeta = beta;
                 return;
             }
             
-            // Változás az előző pozícióhoz képest
-            const betaChange = beta - lastBeta;
+            const tiltDifference = beta - initialBeta;
             
-            // Csak erős billentésre reagáljon (45° változás)
-            if (Math.abs(betaChange) > TILT_THRESHOLD) {
+            // Lefele billentés (előre dől, beta növekszik): TALÁLAT
+            if (tiltDifference > TILT_THRESHOLD) {
                 lastTiltTime = now;
-                
-                // Homlokról lefelé nézés (pozitív beta növekedés): TALÁLAT
-                if (betaChange > TILT_THRESHOLD) {
-                    score++;
-                    playBeep(800, 0.2);
-                    document.getElementById('word').textContent = '✓ TALÁLAT!';
-                    setTimeout(newWord, 500);
-                }
-                // Homlokról felfelé nézés (negatív beta csökkenés): PASSZ
-                else if (betaChange < -TILT_THRESHOLD) {
-                    playBeep(400, 0.2);
-                    document.getElementById('word').textContent = '→ PASSZ';
-                    setTimeout(newWord, 500);
-                }
-                
-                lastBeta = beta; // Új referencia
+                score++;
+                playBeep(800, 0.2);
+                document.getElementById('word').textContent = '✓ TALÁLAT!';
+                setTimeout(() => {
+                    newWord();
+                    initialBeta = null; // Reset kalibrációhoz
+                }, 500);
+            }
+            // Felfele billentés (hátra dől, beta csökken): PASSZ
+            else if (tiltDifference < -TILT_THRESHOLD) {
+                lastTiltTime = now;
+                playBeep(400, 0.2);
+                document.getElementById('word').textContent = '→ PASSZ';
+                setTimeout(() => {
+                    newWord();
+                    initialBeta = null; // Reset kalibrációhoz
+                }, 500);
             }
         }
 
@@ -167,7 +167,6 @@
             if (!gameRunning || currentWords.length === 0) return;
             const idx = Math.floor(Math.random() * currentWords.length);
             document.getElementById('word').textContent = currentWords[idx];
-            lastBeta = null; // Reset referencia új szónál
         }
 
         function updateDisplay() {

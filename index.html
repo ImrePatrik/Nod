@@ -12,8 +12,8 @@
             -webkit-tap-highlight-color: transparent;
         }
         html, body { 
-            width: 100%; 
-            height: 100%; 
+            width: 100vw; 
+            height: 100vh; 
             overflow: hidden;
             position: fixed;
             overscroll-behavior: none;
@@ -21,59 +21,87 @@
         }
         body { 
             font-family: Arial, sans-serif; 
-            background: linear-gradient(#ff6b6b, #feca57);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             text-align: center;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
-            justify-content: space-around;
+            justify-content: space-between;
         }
         #word { 
-            font-size: clamp(3em, 10vw, 5em); 
+            font-size: clamp(2.5em, 8vw, 4.5em); 
             font-weight: bold; 
             color: white; 
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.4); 
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            line-height: 1.2;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         select, button { 
-            font-size: 1.2em; 
-            padding: 12px 20px; 
-            margin: 5px; 
-            border-radius: 10px; 
+            font-size: 1.1em; 
+            padding: 10px 18px; 
+            border-radius: 8px; 
             border: none; 
             background: white; 
             cursor: pointer;
             touch-action: manipulation;
+            font-weight: 600;
         }
-        .preset-btn.active { background: #4ecdc4; color: white; font-weight: bold; }
-        #timer { font-size: 2.5em; color: white; font-weight: bold; }
-        #score { font-size: 1.8em; color: white; margin: 5px; }
-        .presets { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-        #orientationWarning {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.9);
+        .preset-btn.active { 
+            background: #4ecdc4; 
+            color: white; 
+            box-shadow: 0 4px 12px rgba(78,205,196,0.4);
+        }
+        #startBtn {
+            background: #f38181;
             color: white;
-            font-size: 2em;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
+            font-size: 1.3em;
+            padding: 12px 30px;
         }
-        #orientationWarning.show { display: flex; }
-        .rotate-icon { font-size: 4em; margin-bottom: 20px; }
+        #timer { 
+            font-size: 3em; 
+            color: white; 
+            font-weight: bold; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        #score { 
+            font-size: 2em; 
+            color: white; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .status-bar {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: white;
+            font-size: 2.5em;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
     </style>
     <script>
         let words = {
-            allatok: ['kutya', 'macska', 'oroszlán', 'pingvin', 'kígyó', 'madár', 'hal', 'róka', 'elefánt', 'teknős'],
-            szineszek: ['Tom Cruise', 'Johnny Depp', 'Emma Watson', 'Dwayne Johnson', 'Margot Robbie', 'Brad Pitt'],
-            filmek: ['Csillagok háborúja', 'Titanic', 'Jégvarázs', 'Avengers', 'Harry Potter', 'Pán Péter'],
-            tevekenysegek: ['futás', 'tánc', 'énekelés', 'ugrálás', 'evés', 'aludás', 'úszás', 'olvasás']
+            allatok: ['kutya', 'macska', 'oroszlán', 'pingvin', 'kígyó', 'madár', 'hal', 'róka', 'elefánt', 'teknős', 'farkas', 'medve'],
+            szineszek: ['Tom Cruise', 'Johnny Depp', 'Emma Watson', 'Dwayne Johnson', 'Margot Robbie', 'Brad Pitt', 'Leonardo DiCaprio'],
+            filmek: ['Csillagok háborúja', 'Titanic', 'Jégvarázs', 'Avengers', 'Harry Potter', 'Pán Péter', 'Mátrix', 'Alien'],
+            tevekenysegek: ['futás', 'tánc', 'énekelés', 'ugrálás', 'evés', 'aludás', 'úszás', 'olvasás', 'rajzolás', 'sétálás']
         };
         let currentWords = []; 
         let score = 0; 
@@ -84,8 +112,8 @@
         let lastTiltTime = 0;
         let initialGamma = null;
         const audioCtx = new (window.AudioContext || window.webkitAudioContext || (() => {}))();
-        const TILT_THRESHOLD = 35;
-        const DEBOUNCE_MS = 900;
+        const TILT_THRESHOLD = 30; // Landscape-optimalizált
+        const DEBOUNCE_MS = 850;
 
         // Görgetés tiltása
         document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -95,32 +123,12 @@
             document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
             document.getElementById('startBtn').onclick = startGame;
             selectPreset({target: document.querySelector('.preset-btn')});
-            checkOrientation();
-            window.addEventListener('orientationchange', checkOrientation);
-            screen.orientation?.addEventListener('change', checkOrientation);
+            
+            // Landscape lock próba
+            try {
+                screen.orientation?.lock('landscape').catch(() => {});
+            } catch(e) {}
         };
-
-        function checkOrientation() {
-            const isLandscape = window.innerWidth > window.innerHeight;
-            const warning = document.getElementById('orientationWarning');
-            if (!isLandscape) {
-                warning.classList.add('show');
-                if (gameRunning) {
-                    // Szüneteltetés portrait módban
-                    if (gameTimer) clearInterval(gameTimer);
-                }
-            } else {
-                warning.classList.remove('show');
-                // Folytatás ha játék közben fordítottál vissza
-                if (gameRunning && !gameTimer) {
-                    gameTimer = setInterval(() => {
-                        timeLeft--; updateDisplay();
-                        if (timeLeft > 0 && timeLeft <= 10) playBeep(1200, 0.05);
-                        if (timeLeft <= 0) endGame();
-                    }, 1000);
-                }
-            }
-        }
 
         function selectPreset(e) {
             document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
@@ -141,19 +149,6 @@
         }
 
         async function startGame() {
-            // Ellenőrzés landscape-re
-            if (window.innerWidth <= window.innerHeight) {
-                alert('Fordítsd el a telefont fekvő módba!');
-                return;
-            }
-
-            // Landscape lock próba
-            try {
-                await screen.orientation?.lock('landscape');
-            } catch(e) {
-                console.log('Orientation lock nem támogatott');
-            }
-
             if (gameTimer) clearInterval(gameTimer);
             
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -182,7 +177,7 @@
             const now = Date.now();
             if (now - lastTiltTime < DEBOUNCE_MS) return;
             
-            // Landscape: gamma használata (bal/jobb -> előre/hátra billentés landscape-ben)
+            // Landscape: gamma = telefon oldal előre/hátra billentés
             const gamma = event.gamma; // -90 to 90
             
             if (initialGamma === null) {
@@ -192,18 +187,18 @@
             
             const tiltDifference = gamma - initialGamma;
             
-            // Lefele billentés (előre dől landscape-ben, gamma növekszik): TALÁLAT
+            // Előre billentés (jobb oldal előre, gamma pozitív): TALÁLAT
             if (tiltDifference > TILT_THRESHOLD) {
                 lastTiltTime = now;
                 score++;
-                playBeep(800, 0.2);
+                playBeep(900, 0.2);
                 document.getElementById('word').textContent = '✓ TALÁLAT!';
                 setTimeout(() => {
                     newWord();
                     initialGamma = null;
                 }, 500);
             }
-            // Felfele billentés (hátra dől, gamma csökken): PASSZ
+            // Hátra billentés (bal oldal előre, gamma negatív): PASSZ
             else if (tiltDifference < -TILT_THRESHOLD) {
                 lastTiltTime = now;
                 playBeep(400, 0.2);
@@ -231,36 +226,38 @@
             gameTimer = null;
             gameRunning = false;
             window.removeEventListener('deviceorientation', handleOrientation);
-            document.getElementById('word').textContent = 'KÖR VÉGE! ' + score + ' pont';
+            document.getElementById('word').textContent = 'Vége! ' + score + ' pont';
             playBeep(200, 1);
-            try {
-                screen.orientation?.unlock();
-            } catch(e) {}
         }
     </script>
 </head>
 <body>
-    <div id="orientationWarning">
-        <div class="rotate-icon">📱 ↻</div>
-        <div>Fordítsd el a telefont<br>fekvő módba!</div>
+    <h1>Nod!</h1>
+    
+    <div class="status-bar">
+        <div id="timer">60s</div>
+        <div id="score">Pont: 0</div>
     </div>
     
+    <div id="word">Válassz kategóriát!</div>
+    
     <div class="controls">
-        <select id="category">
-            <option value="allatok">Állatok</option>
-            <option value="szineszek">Színészek</option>
-            <option value="filmek">Filmek</option>
-            <option value="tevekenysegek">Tevékenységek</option>
-        </select>
-        <div class="presets">
+        <div class="row">
+            <select id="category">
+                <option value="allatok">Állatok</option>
+                <option value="szineszek">Színészek</option>
+                <option value="filmek">Filmek</option>
+                <option value="tevekenysegek">Tevékenységek</option>
+            </select>
+        </div>
+        <div class="row">
             <button class="preset-btn" data-time="30">30s</button>
             <button class="preset-btn" data-time="45">45s</button>
             <button class="preset-btn active" data-time="60">60s</button>
         </div>
-        <button id="startBtn">START</button>
+        <div class="row">
+            <button id="startBtn">START</button>
+        </div>
     </div>
-    <div id="timer">60s</div>
-    <div id="score">Pont: 0</div>
-    <div id="word">Fordítsd fekvőre!</div>
 </body>
 </html>

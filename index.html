@@ -26,26 +26,13 @@
             background: #6366f1;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             padding: 15px;
             touch-action: none;
         }
-        @media (orientation: portrait) {
-            body::before {
-                content: '🔄 Fordítsd el fektetve!';
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: #1e293b;
-                color: white;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 2em;
-                font-weight: 900;
-                z-index: 9999;
-                text-align: center;
-            }
+        body.game-mode {
+            justify-content: space-between;
         }
         #word { 
             font-size: clamp(2.5em, 8vw, 4.5em); 
@@ -53,7 +40,6 @@
             color: #ffffff; 
             text-shadow: 0 3px 10px rgba(0,0,0,0.3); 
             text-align: center;
-            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -61,11 +47,21 @@
             padding: 15px;
             line-height: 1.1;
         }
+        body.game-mode #word {
+            flex: 1;
+        }
         .stats {
             display: flex;
             justify-content: space-between;
             width: 100%;
             max-width: 700px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s;
+        }
+        body.game-mode .stats {
+            opacity: 1;
+            visibility: visible;
         }
         #timer, #score { 
             font-size: 2.2em; 
@@ -165,7 +161,7 @@
             document.getElementById('startBtn').onclick = startGame;
             selectPreset({target: document.querySelector('.preset-btn[data-time="60"]')});
             
-            // Landscape lock próba
+            // Landscape lock
             if (screen.orientation && screen.orientation.lock) {
                 screen.orientation.lock('landscape').catch(() => {});
             }
@@ -192,14 +188,46 @@
             } catch(e) {}
         }
 
+        async function requestOrientationPermission() {
+            // Ellenőrizzük localStorage-ban van-e már engedély
+            const permissionGranted = localStorage.getItem('orientationPermission');
+            
+            if (permissionGranted === 'granted') {
+                return true;
+            }
+            
+            // Csak iOS-en kell explicit kérés
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        localStorage.setItem('orientationPermission', 'granted');
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } catch(e) {
+                    return false;
+                }
+            } else {
+                // Android/desktop - nincs szükség engedélyre
+                localStorage.setItem('orientationPermission', 'granted');
+                return true;
+            }
+        }
+
         async function startGame() {
             if (gameTimer) clearInterval(gameTimer);
             
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission !== 'granted') return alert('Tájérzékelő engedély kell!');
+            // Engedély kérés (csak egyszer)
+            const hasPermission = await requestOrientationPermission();
+            if (!hasPermission) {
+                alert('Tájérzékelő engedély kell!');
+                return;
             }
             
+            // Game mode layout
+            document.body.classList.add('game-mode');
             document.querySelector('.controls').classList.add('hidden');
             
             const cat = document.getElementById('category').value;
@@ -276,6 +304,8 @@
             document.getElementById('word').textContent = 'Vége! ' + score + ' pont';
             playBeep(200, 1);
             
+            // Vissza menu layout
+            document.body.classList.remove('game-mode');
             document.querySelector('.controls').classList.remove('hidden');
         }
     </script>

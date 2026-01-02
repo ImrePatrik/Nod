@@ -5,69 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="manifest.json">
-    <title>Nod!</title>
+    <title>Nod! Debug</title>
     <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { 
-            width: 100%; 
-            height: 100%; 
-            overflow: hidden;
-            position: fixed;
-            overscroll-behavior: none;
+            width: 100%; height: 100%; overflow: hidden; position: fixed;
         }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            font-family: Arial, sans-serif;
             background: #6366f1;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 15px;
-            touch-action: none;
+            color: white;
         }
-        body.game-mode {
-            justify-content: space-between;
-        }
+        body.game-mode { justify-content: space-between; }
         #word { 
             font-size: clamp(2.5em, 8vw, 4.5em); 
             font-weight: 900; 
-            color: #ffffff; 
-            text-shadow: 0 3px 10px rgba(0,0,0,0.3); 
             text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
             width: 100%;
             padding: 15px;
-            line-height: 1.1;
         }
-        body.game-mode #word {
-            flex: 1;
-        }
+        body.game-mode #word { flex: 1; }
         .stats {
             display: flex;
             justify-content: space-between;
             width: 100%;
             max-width: 700px;
             opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s;
         }
-        body.game-mode .stats {
-            opacity: 1;
-            visibility: visible;
-        }
-        #timer, #score { 
-            font-size: 2.2em; 
-            color: #ffffff; 
-            font-weight: 900;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        body.game-mode .stats { opacity: 1; }
+        #timer, #score { font-size: 2.2em; font-weight: 900; }
+        #debug {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            font-size: 0.9em;
+            border-radius: 5px;
+            font-family: monospace;
         }
         .controls {
             width: 100%;
@@ -77,68 +60,31 @@
             gap: 12px;
             align-items: center;
         }
-        .controls.hidden {
-            display: none;
-        }
+        .controls.hidden { display: none; }
         select { 
-            font-size: 1.2em; 
-            padding: 12px 20px; 
-            border-radius: 12px; 
-            border: none; 
-            background: #ffffff; 
-            cursor: pointer;
-            font-weight: 700;
-            width: 100%;
-            color: #6366f1;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+            font-size: 1.2em; padding: 12px 20px; 
+            border-radius: 12px; border: none; 
+            background: white; cursor: pointer;
+            font-weight: 700; width: 100%; color: #6366f1;
         }
-        .presets {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            width: 100%;
-        }
+        .presets { display: flex; gap: 10px; width: 100%; }
         .preset-btn { 
-            font-size: 1.1em; 
-            padding: 10px 20px; 
-            border-radius: 12px; 
-            border: 2px solid #ffffff; 
-            background: transparent; 
-            color: #ffffff;
-            cursor: pointer;
-            font-weight: 800;
-            flex: 1;
-            max-width: 120px;
-            transition: all 0.2s;
+            font-size: 1.1em; padding: 10px 20px; 
+            border-radius: 12px; border: 2px solid white; 
+            background: transparent; color: white;
+            cursor: pointer; font-weight: 800; flex: 1;
         }
-        .preset-btn.active { 
-            background: #ffffff; 
-            color: #6366f1;
-            transform: scale(1.05);
-            box-shadow: 0 3px 12px rgba(0,0,0,0.3);
-        }
+        .preset-btn.active { background: white; color: #6366f1; }
         #startBtn {
-            font-size: 1.5em;
-            padding: 14px 40px;
-            border-radius: 15px;
-            border: none;
-            background: #ffffff;
-            color: #6366f1;
-            font-weight: 900;
-            cursor: pointer;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.3);
-            transition: all 0.2s;
-        }
-        #startBtn:active {
-            transform: scale(0.95);
+            font-size: 1.5em; padding: 14px 40px;
+            border-radius: 15px; border: none;
+            background: white; color: #6366f1;
+            font-weight: 900; cursor: pointer;
         }
     </style>
     <script>
         let words = {
-            allatok: ['kutya', 'macska', 'oroszlán', 'pingvin', 'kígyó', 'madár', 'hal', 'róka', 'elefánt', 'teknős', 'farkas', 'medve', 'tigris', 'panda', 'zsiráf'],
-            szineszek: ['Tom Cruise', 'Johnny Depp', 'Emma Watson', 'Dwayne Johnson', 'Margot Robbie', 'Brad Pitt', 'Leonardo DiCaprio', 'Angelina Jolie', 'Will Smith'],
-            filmek: ['Csillagok háborúja', 'Titanic', 'Jégvarázs', 'Avengers', 'Harry Potter', 'Pán Péter', 'Mátrix', 'Alien', 'Avatar', 'Jurassic Park', 'Inception'],
-            tevekenysegek: ['futás', 'tánc', 'énekelés', 'ugrálás', 'evés', 'aludás', 'úszás', 'olvasás', 'rajzolás', 'főzés', 'kerékpározás', 'síelés']
+            allatok: ['kutya', 'macska', 'oroszlán', 'pingvin', 'kígyó', 'madár', 'hal', 'róka', 'elefánt', 'teknős', 'farkas', 'medve']
         };
         let currentWords = []; 
         let score = 0; 
@@ -148,23 +94,13 @@
         let maxTime = 60;
         let lastTiltTime = 0;
         let initialGamma = null;
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext || (() => {}))();
         const TILT_THRESHOLD = 30;
         const DEBOUNCE_MS = 850;
-
-        document.addEventListener('touchmove', (e) => {
-            if (gameRunning) e.preventDefault();
-        }, { passive: false });
 
         window.onload = () => {
             document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
             document.getElementById('startBtn').onclick = startGame;
             selectPreset({target: document.querySelector('.preset-btn[data-time="60"]')});
-            
-            // Landscape lock
-            if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch(() => {});
-            }
         };
 
         function selectPreset(e) {
@@ -173,44 +109,23 @@
             maxTime = parseInt(e.target.dataset.time);
         }
 
-        function playBeep(frequency, duration) {
-            try {
-                const oscillator = audioCtx.createOscillator(); 
-                const gainNode = audioCtx.createGain();
-                oscillator.connect(gainNode); 
-                gainNode.connect(audioCtx.destination);
-                oscillator.frequency.value = frequency; 
-                oscillator.type = 'sine';
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                oscillator.start(audioCtx.currentTime); 
-                oscillator.stop(audioCtx.currentTime + duration);
-            } catch(e) {}
-        }
-
         async function requestOrientationPermission() {
-            // Ellenőrizzük localStorage-ban van-e már engedély
             const permissionGranted = localStorage.getItem('orientationPermission');
+            if (permissionGranted === 'granted') return true;
             
-            if (permissionGranted === 'granted') {
-                return true;
-            }
-            
-            // Csak iOS-en kell explicit kérés
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     const permission = await DeviceOrientationEvent.requestPermission();
                     if (permission === 'granted') {
                         localStorage.setItem('orientationPermission', 'granted');
                         return true;
-                    } else {
-                        return false;
                     }
+                    return false;
                 } catch(e) {
+                    document.getElementById('debug').innerHTML += '<br>Permission error: ' + e;
                     return false;
                 }
             } else {
-                // Android/desktop - nincs szükség engedélyre
                 localStorage.setItem('orientationPermission', 'granted');
                 return true;
             }
@@ -219,14 +134,12 @@
         async function startGame() {
             if (gameTimer) clearInterval(gameTimer);
             
-            // Engedély kérés (csak egyszer)
             const hasPermission = await requestOrientationPermission();
             if (!hasPermission) {
                 alert('Tájérzékelő engedély kell!');
                 return;
             }
             
-            // Game mode layout
             document.body.classList.add('game-mode');
             document.querySelector('.controls').classList.add('hidden');
             
@@ -245,17 +158,26 @@
             gameTimer = setInterval(() => {
                 timeLeft--; 
                 updateDisplay();
-                if (timeLeft > 0 && timeLeft <= 10) playBeep(1200, 0.05);
                 if (timeLeft <= 0) endGame();
             }, 1000);
         }
 
         function handleOrientation(event) {
+            const gamma = event.gamma || 0;
+            const beta = event.beta || 0;
+            const alpha = event.alpha || 0;
+            
+            // DEBUG INFO
+            document.getElementById('debug').innerHTML = 
+                `Gamma: ${gamma.toFixed(1)}°<br>` +
+                `Beta: ${beta.toFixed(1)}°<br>` +
+                `Alpha: ${alpha.toFixed(1)}°<br>` +
+                `Initial: ${initialGamma ? initialGamma.toFixed(1) : 'null'}°<br>` +
+                `Diff: ${initialGamma ? (gamma - initialGamma).toFixed(1) : 'N/A'}°`;
+            
             if (!gameRunning) return;
             const now = Date.now();
             if (now - lastTiltTime < DEBOUNCE_MS) return;
-            
-            const gamma = event.gamma;
             
             if (initialGamma === null) {
                 initialGamma = gamma;
@@ -267,7 +189,6 @@
             if (tiltDifference > TILT_THRESHOLD) {
                 lastTiltTime = now;
                 score++;
-                playBeep(900, 0.2);
                 document.getElementById('word').textContent = '✓ TALÁLAT!';
                 setTimeout(() => {
                     newWord();
@@ -276,7 +197,6 @@
             }
             else if (tiltDifference < -TILT_THRESHOLD) {
                 lastTiltTime = now;
-                playBeep(400, 0.2);
                 document.getElementById('word').textContent = '→ PASSZ';
                 setTimeout(() => {
                     newWord();
@@ -302,9 +222,6 @@
             gameRunning = false;
             window.removeEventListener('deviceorientation', handleOrientation);
             document.getElementById('word').textContent = 'Vége! ' + score + ' pont';
-            playBeep(200, 1);
-            
-            // Vissza menu layout
             document.body.classList.remove('game-mode');
             document.querySelector('.controls').classList.remove('hidden');
         }
@@ -317,19 +234,17 @@
     </div>
     
     <div id="word">Nod!</div>
+    <div id="debug">Debug...</div>
     
     <div class="controls">
         <select id="category">
             <option value="allatok">Állatok</option>
-            <option value="szineszek">Színészek</option>
-            <option value="filmek">Filmek</option>
-            <option value="tevekenysegek">Tevékenységek</option>
         </select>
         
         <div class="presets">
             <button class="preset-btn" data-time="30">30s</button>
             <button class="preset-btn" data-time="45">45s</button>
-            <button class="preset-btn" data-time="60">60s</button>
+            <button class="preset-btn active" data-time="60">60s</button>
         </div>
         
         <button id="startBtn">START</button>

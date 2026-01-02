@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
     <title>Nod!</title>
     <style>
         * { 
@@ -28,6 +30,22 @@
             align-items: center;
             padding: 15px;
             touch-action: none;
+        }
+        @media (orientation: portrait) {
+            body::before {
+                content: '🔄 Fordítsd el fektetve!';
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: #1e293b;
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 2em;
+                font-weight: 900;
+                z-index: 9999;
+                text-align: center;
+            }
         }
         #word { 
             font-size: clamp(2.5em, 8vw, 4.5em); 
@@ -146,6 +164,11 @@
             document.querySelectorAll('.preset-btn').forEach(btn => btn.onclick = selectPreset);
             document.getElementById('startBtn').onclick = startGame;
             selectPreset({target: document.querySelector('.preset-btn[data-time="60"]')});
+            
+            // Landscape lock próba
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
         };
 
         function selectPreset(e) {
@@ -177,7 +200,6 @@
                 if (permission !== 'granted') return alert('Tájérzékelő engedély kell!');
             }
             
-            // Gombok azonnali eltüntetése
             document.querySelector('.controls').classList.add('hidden');
             
             const cat = document.getElementById('category').value;
@@ -254,7 +276,6 @@
             document.getElementById('word').textContent = 'Vége! ' + score + ' pont';
             playBeep(200, 1);
             
-            // Gombok visszamutatása
             document.querySelector('.controls').classList.remove('hidden');
         }
     </script>
